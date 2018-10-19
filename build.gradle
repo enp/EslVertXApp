@@ -1,0 +1,29 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+sourceCompatibility = 1.8
+
+mainClassName = 'io.vertx.core.Launcher'
+
+def mainVerticleName = 'ru.itx.esl.Verticle'
+
+jar {
+	from { configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) } }
+	manifest {
+		attributes 'Main-Class': mainClassName
+		attributes 'Main-Verticle': mainVerticleName
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	compile 'io.vertx:vertx-core:3.+'
+    compile 'org.slf4j:slf4j-simple:1.7.+' 
+}
+
+run {
+	args = ['run', mainVerticleName]
+}
