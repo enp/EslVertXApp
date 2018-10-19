@@ -1,0 +1,28 @@
+<html>
+<head><title>WSS</title></head>
+<body>
+<script>
+    if (window.WebSocket) {
+        var socket = new WebSocket('ws://' + location.host + '/ws')
+        socket.onmessage = function(message) {
+        	var event = JSON.parse(message.data)
+        	var uuid = event['Unique-ID']
+            console.log(event)
+            if (event['Event-Name'] == 'CHANNEL_PARK')
+            	socket.send('bgapi uuid_answer '+uuid)
+            else if (event['Event-Name'] == 'CHANNEL_ANSWER')
+            	socket.send('bgapi uuid_kill '+uuid+' CALL_REJECTED')
+        }
+        socket.onopen = function() {
+            console.log('websocket opened')
+            socket.send('event plain CHANNEL_PARK CHANNEL_ANSWER CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE')
+        }
+        socket.onclose = function() {
+            console.log('websocket closed')
+        }
+    } else {
+        console.log('Your browser does not support websockets')
+    }
+</script>
+</body>
+</html>
