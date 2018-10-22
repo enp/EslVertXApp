@@ -9,13 +9,15 @@
         	var uuid = event['Unique-ID']
             console.log(event)
             if (event['Event-Name'] == 'CHANNEL_PARK')
-            	socket.send('bgapi uuid_answer '+uuid)
+            	socket.send('api uuid_answer '+uuid)
             else if (event['Event-Name'] == 'CHANNEL_ANSWER')
-            	socket.send('bgapi uuid_kill '+uuid+' CALL_REJECTED')
+            	socket.send('api uuid_broadcast '+uuid+' playback::/usr/share/freeswitch/sounds/ru/RU/elena/ivr/8000/ivr-welcome.wav')
+            else if (event['Event-Name'] == 'PLAYBACK_STOP')
+                socket.send('api uuid_kill '+uuid+' CALL_REJECTED')
         }
         socket.onopen = function() {
             console.log('websocket opened')
-            socket.send('event plain CHANNEL_PARK CHANNEL_ANSWER CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE')
+            socket.send('event text CHANNEL_PARK CHANNEL_ANSWER PLAYBACK_START PLAYBACK_STOP CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE')
         }
         socket.onclose = function() {
             console.log('websocket closed')

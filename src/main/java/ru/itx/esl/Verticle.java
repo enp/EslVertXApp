@@ -1,12 +1,16 @@
 package ru.itx.esl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -19,6 +23,19 @@ public class Verticle extends AbstractVerticle {
 	private Logger logger = LoggerFactory.getLogger(Verticle.class);
 	
 	private NetSocket eslSocket;
+	
+	private Buffer eslBuffer;
+	
+	private List<String> headers = new ArrayList<String>(Arrays.asList(
+		"Content-Type",
+		"Event-Name",
+		"Unique-ID",
+		"Caller-Caller-ID-Number",
+		"Caller-Destination-Number",
+		"variable_sip_history_info"
+	));
+	
+	Pattern pattern = Pattern.compile("%3Csip%3A%2B(.*?)%40");
 	
 	private List<ServerWebSocket> webSockets = new ArrayList<ServerWebSocket>();
 
@@ -34,34 +51,47 @@ public class Verticle extends AbstractVerticle {
 				future.complete();
 				eslSocket = result.result();
 				eslSocket.handler(RecordParser.newDelimited("\n\n", buffer -> {
-					Map<String,Object> message = new HashMap<String, Object>();
-					StringBuilder body = new StringBuilder();
-					for (String line : buffer.toString().split("\n")) {
-						String[] keyvalue = line.split(":");
-						if (keyvalue.length == 2) {
-							if (keyvalue[0].trim().equals("Event-Name") || 
-								keyvalue[0].trim().equals("Unique-ID") || 
-								keyvalue[0].trim().equals("Content-Type"))
-								message.put(keyvalue[0].trim(), keyvalue[1].trim());
-						} else {
-							body.append(line);
-							body.append("\n");
+					if (buffer.toString().contains("Content-Length")) {
+						eslBuffer = buffer;
+					} else {
+						Map<String,Object> message = new HashMap<String, Object>();
+						StringBuilder body = new StringBuilder();
+						if (eslBuffer != null) {
+							buffer = eslBuffer.appendBuffer(Buffer.buffer("\n")).appendBuffer(buffer);
+							eslBuffer = null;
 						}
-					}
-					if (body.length() > 0)
-						message.put("Body", body);
-					logger.info("Message : " + message);
-					for (ServerWebSocket webSocket : webSockets) {
-						try {
-							webSocket.writeTextMessage(new JsonObject(message).toString());
-						} catch (Exception e) {
-							webSockets.remove(webSocket);
-							logger.info("Removed WebSocket : " + webSocket);
+						for (String line : buffer.toString().split("\n")) {
+							String[] keyvalue = line.split(":");
+							if (keyvalue.length == 2) {
+								if (headers.contains(keyvalue[0].trim()))
+									message.put(keyvalue[0].trim(), keyvalue[1].trim());
+							} else {
+								body.append(line);
+								body.append("\n");
+							}
+						}
+						if (body.length() > 0)
+							message.put("Body", body);
+						if (message.get("variable_sip_history_info") != null) {
+							Matcher matcher = pattern.matcher(message.get("variable_sip_history_info").toString());
+							if (matcher.find()) {
+								message.put("Caller-History-Number", matcher.group(1));
+								message.remove("variable_sip_history_info");
+							}
+						}
+						logger.info("Message : " + message);
+						for (ServerWebSocket webSocket : webSockets) {
+							try {
+								if (webSocket != null)
+									webSocket.writeTextMessage(new JsonObject(message).toString());
+							} catch (Exception e) {
+								logger.info("Removing WebSocket : " + webSocket + " due to : " + e.toString());
+								webSockets.remove(webSocket);
+							}
 						}
 					}
 				}));
 				command("auth ClueCon");
-				//command("event text ALL");
 			} else {
 				future.fail(result.cause());
 			}
@@ -75,7 +105,7 @@ public class Verticle extends AbstractVerticle {
 	    		webSockets.add(webSocket);
 	    		webSocket.handler(buffer -> {
 	    			try {
-	    				command(buffer.toString());	    				
+	    				command(buffer.toString());
 					} catch (Exception e) {
 						logger.error(e);
 					}
