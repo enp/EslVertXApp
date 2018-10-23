@@ -8,8 +8,8 @@
             console.log('websocket opened')
         }
         socket.onmessage = function(message) {
-        	var event = JSON.parse(message.data)
-        	var uuid = event['Unique-ID']
+            var event = JSON.parse(message.data)
+            var uuid = event['Unique-ID']
             console.log(event)
             switch (event['Event-Name']) {
             	case 'CHANNEL_PARK':
