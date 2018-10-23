@@ -1,5 +1,7 @@
 package ru.itx.esl;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,7 +39,7 @@ public class Verticle extends AbstractVerticle {
 		"variable_sip_history_info"
 	));
 	
-	Pattern pattern = Pattern.compile("%3Csip%3A%2B(.*?)%40");
+	Pattern pattern = Pattern.compile("<sip:(\\+.*?)@");
 	
 	private List<ServerWebSocket> webSockets = new ArrayList<ServerWebSocket>();
 	
@@ -113,7 +115,11 @@ public class Verticle extends AbstractVerticle {
 			String[] keyvalue = line.split(":");
 			if (keyvalue.length == 2) {
 				if (headers.contains(keyvalue[0].trim()))
-					message.put(keyvalue[0].trim(), keyvalue[1].trim());
+					try {
+						message.put(keyvalue[0].trim(), URLDecoder.decode(keyvalue[1].trim(), "UTF-8"));
+					} catch (UnsupportedEncodingException e) {
+						logger.info("Wrong header : " + keyvalue[0].trim() + " => " + keyvalue[1].trim());
+					}
 			} else {
 				body.append(line);
 				body.append("\n");
