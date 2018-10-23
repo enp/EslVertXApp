@@ -64,7 +64,7 @@ public class Verticle extends AbstractVerticle {
 							String[] keyvalue = line.split(":");
 							if (keyvalue.length == 2) {
 								if (headers.contains(keyvalue[0].trim()))
-									message.put(keyvalue[0].trim(), keyvalue[1].trim());
+									message.put(keyvalue[0].trim(), keyvalue[1].trim().replace("%2B", ""));
 							} else {
 								body.append(line);
 								body.append("\n");
@@ -92,6 +92,7 @@ public class Verticle extends AbstractVerticle {
 					}
 				}));
 				command("auth ClueCon");
+				command("event text CHANNEL_PARK CHANNEL_ANSWER PLAYBACK_START PLAYBACK_STOP CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE");
 			} else {
 				future.fail(result.cause());
 			}
@@ -105,7 +106,7 @@ public class Verticle extends AbstractVerticle {
 	    		webSockets.add(webSocket);
 	    		webSocket.handler(buffer -> {
 	    			try {
-	    				command(buffer.toString());
+	    				command(buffer.toJsonObject());
 					} catch (Exception e) {
 						logger.error(e);
 					}
@@ -116,6 +117,23 @@ public class Verticle extends AbstractVerticle {
 	    			request.response().end(vertx.fileSystem().readFileBlocking("websocket.html"));
 			})
 			.listen(webPort, webHost);
+	}
+
+	private void command(JsonObject command) {
+		String uuid = command.getString("uuid");
+		String action = command.getString("action");
+		String commandText = null;
+		if (action.equals("answer")) {
+			commandText = "api uuid_answer "+uuid;
+		} else if (action.equals("playback")) {
+			commandText = "api uuid_broadcast "+uuid+" playback::/opt/sounds/"+command.getString("file");
+		} else if (action.equals("hangup")) {
+			commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
+		} 
+		if (commandText != null)
+			command(commandText);
+		else
+			logger.info("Wrong JSON command : " + command);
 	}
 
 	private void command(String command) {
