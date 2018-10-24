@@ -2,33 +2,38 @@
 <head><title>WSS</title></head>
 <body>
 <script>
-    if (window.WebSocket) {
-        var socket = new WebSocket('ws://' + location.host + '/ws')
-        socket.onopen = function() {
-            console.log('websocket opened')
-        }
-        socket.onmessage = function(message) {
-            var event = JSON.parse(message.data)
-            var uuid = event['Unique-ID']
-            console.log(event)
-            switch (event['Event-Name']) {
-            	case 'CHANNEL_PARK':
-            		socket.send(JSON.stringify({ uuid : uuid, action : 'answer' }))
-            		break
-            	case 'CHANNEL_ANSWER':
-            		socket.send(JSON.stringify({ uuid : uuid, action : 'playback', file : 'welcome.wav' }))
-            		break
-            	case 'PLAYBACK_STOP':
-            		socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
-            		break
-            }
-        }
-        socket.onclose = function() {
-            console.log('websocket closed')
-        }
-    } else {
-        console.log('Your browser does not support websockets')
-    }
+	window.onload = function() {
+	    if (window.WebSocket) {
+	        var socket = new WebSocket('ws://' + location.host + '/ws')
+	        socket.onopen = function() {
+	            console.log('websocket opened')
+	        }
+	        socket.onmessage = function(message) {
+	            var event = JSON.parse(message.data)
+	            var uuid = event['Unique-ID']
+	            console.log(event)
+	            switch (event['Event-Name']) {
+	            	case 'CHANNEL_PARK':
+	            		socket.send(JSON.stringify({ uuid : uuid, action : 'answer' }))
+	            		break
+	            	case 'CHANNEL_ANSWER':
+	            		socket.send(JSON.stringify({ uuid : uuid, action : 'playback', file : 'welcome.wav' }))
+	            		break
+	            	case 'PLAYBACK_STOP':
+	            		socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
+	            		break
+	            }
+	        }
+	        socket.onclose = function() {
+	            console.log('websocket closed')
+	        }
+	    } else {
+	        console.log('Your browser does not support websockets')
+	    }
+	    call.onclick = function() { socket.send(JSON.stringify({ action : 'call', destination: destination.value })) }
+	}
 </script>
+<input id='destination'>
+<button id='call'>Call</button>
 </body>
 </html>

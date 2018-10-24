@@ -94,7 +94,7 @@ public class Verticle extends AbstractVerticle {
 				eslBuffer = null;
 			}
 			Map<String,Object> message = eslMessagesParser(buffer);
-			logger.info("Message : " + message);
+			logger.info("Text Message : " + message);
 			ListIterator<ServerWebSocket> webSocketIterator = webSockets.listIterator();
 			while (webSocketIterator.hasNext()) {
 				ServerWebSocket webSocket = webSocketIterator.next();
@@ -138,6 +138,7 @@ public class Verticle extends AbstractVerticle {
 	}
 
 	private void command(JsonObject command) {
+		logger.info("JSON Command : " + command);
 		String uuid = command.getString("uuid");
 		String action = command.getString("action");
 		String commandText = null;
@@ -147,6 +148,8 @@ public class Verticle extends AbstractVerticle {
 			commandText = "api uuid_broadcast "+uuid+" playback::/opt/sounds/"+command.getString("file");
 		} else if (action.equals("hangup")) {
 			commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
+		} else if (action.equals("call")) {
+			commandText = "api originate sofia/gateway/mss/"+command.getString("destination")+" &park()";
 		} 
 		if (commandText != null)
 			command(commandText);
@@ -155,7 +158,7 @@ public class Verticle extends AbstractVerticle {
 	}
 
 	private void command(String command) {
-		logger.info("Command : " + command);
+		logger.info("Text Command : " + command);
 		eslSocket.write(command+"\n\n");		
 	}
 
