@@ -75,10 +75,11 @@ public class Verticle extends AbstractVerticle {
 	private void wsHandler(ServerWebSocket webSocket) {
 		Matcher matcher = patternWSMSISDN.matcher(webSocket.path());
 		if (matcher.find()) {
-			agents.add(new Agent(matcher.group(1), webSocket));
+			Agent agent = new Agent(matcher.group(1), webSocket);
+			agents.add(agent);
 			webSocket.handler(buffer -> {
 				try {
-					command(webSocket, buffer.toJsonObject());
+					command(agent, buffer.toJsonObject());
 				} catch (Exception e) {
 					logger.error(e);
 				}
@@ -176,26 +177,28 @@ public class Verticle extends AbstractVerticle {
 		}
 	}
 
-	private void command(ServerWebSocket webSocket, JsonObject command) {
+	private void command(Agent agent, JsonObject command) {
 		logger.info("JSON Command : " + command);
-		// TODO: check if Unique-ID associated with WebSocket
 		String uuid = command.getString("uuid");
-		String action = command.getString("action");
-		String commandText = null;
-		if (action.equals("answer")) {
-			commandText = "api uuid_answer "+uuid;
-		} else if (action.equals("playback")) {
-			commandText = "api uuid_broadcast "+uuid+" playback::/opt/sounds/"+command.getString("file");
-		} else if (action.equals("hangup")) {
-			commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
-		} else if (action.equals("call")) {
-			String caller = webSocket.path().replace("/ws/", "");
-			commandText = "api originate {origination_caller_id_number="+caller+"}sofia/gateway/mss/"+command.getString("destination")+" &park()";
-		} 
-		if (commandText != null)
-			command(commandText);
-		else
-			logger.info("Wrong JSON command : " + command);
+		if (uuid != null && !agent.getUuids().contains(uuid)) {
+			logger.info("Wrong UUID : " + uuid);
+		} else {
+			String action = command.getString("action");
+			String commandText = null;
+			if (action.equals("answer")) {
+				commandText = "api uuid_answer "+uuid;
+			} else if (action.equals("playback")) {
+				commandText = "api uuid_broadcast "+uuid+" playback::/opt/sounds/"+command.getString("file");
+			} else if (action.equals("hangup")) {
+				commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
+			} else if (action.equals("call")) {
+				commandText = "api originate {origination_caller_id_number="+agent.getMsisdn()+"}sofia/gateway/mss/"+command.getString("destination")+" &park()";
+			} 
+			if (commandText != null)
+				command(commandText);
+			else
+				logger.info("Wrong JSON command : " + command);
+		}
 	}
 
 	private void command(String command) {
