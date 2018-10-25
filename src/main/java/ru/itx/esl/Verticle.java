@@ -158,14 +158,21 @@ public class Verticle extends AbstractVerticle {
 	
 	private boolean eslMessageAllowed(Map<String,Object> message, Agent agent) {
 		if (message.get("Event-Name").equals("CHANNEL_PARK") && message.get("Caller-Logical-Direction").equals("inbound")) {
-			return message.get("Caller-History-Number") != null && message.get("Caller-History-Number").equals(agent.getMsisdn());
-			// TODO: associate Unique-ID of incoming call with WebSocket
+			if (message.get("Caller-History-Number") != null && message.get("Caller-History-Number").equals(agent.getMsisdn())) {
+				agent.getUuids().add(message.get("Unique-ID").toString());
+				return true;
+			} else {
+				return false;
+			}
 		} else if (message.get("Event-Name").equals("CHANNEL_ANSWER") && message.get("Caller-Logical-Direction").equals("outbound")) {
-			return message.get("Caller-Caller-ID-Number") != null && message.get("Caller-Caller-ID-Number").equals(agent.getMsisdn());
-			// TODO: associate Unique-ID of outgoing call with WebSocket
+			if (message.get("Caller-Caller-ID-Number") != null && message.get("Caller-Caller-ID-Number").equals(agent.getMsisdn())) {
+				agent.getUuids().add(message.get("Unique-ID").toString());
+				return true;
+			} else {
+				return false;
+			}
 		} else {
-			// TODO: check if Unique-ID of call associated with WebSocket
-			return true;
+			return agent.getUuids().contains(message.get("Unique-ID"));
 		}
 	}
 
