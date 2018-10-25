@@ -173,7 +173,13 @@ public class Verticle extends AbstractVerticle {
 				return false;
 			}
 		} else {
-			return agent.getUuids().contains(message.get("Unique-ID"));
+			if (agent.getUuids().contains(message.get("Unique-ID"))) {
+				if (message.get("Event-Name").equals("CHANNEL_HANGUP_COMPLETE"))
+					agent.getUuids().remove(message.get("Unique-ID"));
+				return true;
+			} else {
+				return false;
+			}
 		}
 	}
 
