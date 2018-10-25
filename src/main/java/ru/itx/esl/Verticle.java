@@ -77,6 +77,7 @@ public class Verticle extends AbstractVerticle {
 		if (matcher.find()) {
 			Agent agent = new Agent(matcher.group(1), webSocket);
 			agents.add(agent);
+			webSocket.closeHandler(v -> agents.remove(agent));
 			webSocket.handler(buffer -> {
 				try {
 					command(agent, buffer.toJsonObject());
