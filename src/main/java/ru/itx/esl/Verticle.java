@@ -39,6 +39,7 @@ public class Verticle extends AbstractVerticle {
 		"Caller-Caller-ID-Number",
 		"Caller-Destination-Number",
 		"Playback-File-Path",
+		"DTMF-Digit",
 		"variable_sip_history_info"
 	));
 	
@@ -95,7 +96,7 @@ public class Verticle extends AbstractVerticle {
 			eslSocket = result.result();
 			eslSocket.handler(RecordParser.newDelimited("\n\n", this::eslMessagesHandler));
 			command("auth "+conf.getJsonObject("esl").getString("auth", "ClueCon"));
-			command("event text CHANNEL_PARK CHANNEL_ANSWER PLAYBACK_START PLAYBACK_STOP CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE");
+			command("event text CHANNEL_PARK CHANNEL_ANSWER DTMF PLAYBACK_START PLAYBACK_STOP CHANNEL_HANGUP");
 		}
 	}
 	
@@ -175,7 +176,7 @@ public class Verticle extends AbstractVerticle {
 			}
 		} else {
 			if (agent.getUuids().contains(message.get("Unique-ID"))) {
-				if (message.get("Event-Name").equals("CHANNEL_HANGUP_COMPLETE"))
+				if (message.get("Event-Name").equals("CHANNEL_HANGUP"))
 					agent.getUuids().remove(message.get("Unique-ID"));
 				return true;
 			} else {
