@@ -157,13 +157,14 @@ public class Verticle extends AbstractVerticle {
 	
 	private boolean eslMessageAllowed(Map<String,Object> message, ServerWebSocket webSocket) {
 		String msisdn = webSocket.path().replace("/ws/", "");
-		if (message.get("Event-Name").equals("CHANNEL_PARK")) {
-			Object one = message.get("Caller-History-Number");
-			Object two = message.get("Caller-Caller-ID-Number");
-			return one != null && two != null && (one.equals(msisdn) || two.equals(msisdn));
-			// TODO: associate Unique-ID with WebSocket
+		if (message.get("Event-Name").equals("CHANNEL_PARK") && message.get("Caller-History-Number").equals(msisdn)) {
+			// TODO: associate Unique-ID of incoming call with WebSocket
+			return true;
+		} else if (message.get("Event-Name").equals("CHANNEL_ANSWER") && message.get("Caller-Caller-ID-Number").equals(msisdn)) {
+			// TODO: associate Unique-ID of outgoing call with WebSocket
+			return true;
 		} else {
-			// TODO: check if Unique-ID associated with WebSocket
+			// TODO: check if Unique-ID of call associated with WebSocket
 			return true;
 		}
 	}
