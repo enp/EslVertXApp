@@ -2,11 +2,12 @@
 <head><title>WSS</title></head>
 <body>
 <script>
+if (window.WebSocket) {
 	window.onload = function() {
-	    if (window.WebSocket) {
-	        var socket = new WebSocket('ws://' + location.host + '/ws')
+	    socketOpen.onclick = function() {
+	    	socket = new WebSocket('ws://' + location.host + '/ws/' + msisdn.value)
 	        socket.onopen = function() {
-	            console.log('websocket opened')
+	            console.log('websocket '+socket.url+' opened')
 	        }
 	        socket.onmessage = function(message) {
 	            var event = JSON.parse(message.data)
@@ -25,15 +26,24 @@
 	            }
 	        }
 	        socket.onclose = function() {
-	            console.log('websocket closed')
+	            console.log('websocket '+socket.url+' closed')
 	        }
-	    } else {
-	        console.log('Your browser does not support websockets')
 	    }
-	    call.onclick = function() { socket.send(JSON.stringify({ action : 'call', destination: destination.value })) }
-	}
+	    executeCall.onclick = function() {
+	    	socket.send(JSON.stringify({ action : 'call', destination: destination.value }))
+	    }
+	    socketClose.onclick = function() {
+	    	socket.close()
+	    }
+	}    
+} else {
+    console.log('Your browser does not support websockets')
+}
 </script>
+<input id='msisdn'>
+<button id='socketOpen'>Open</button>
+<button id='socketClose'>Close</button>
 <input id='destination'>
-<button id='call'>Call</button>
+<button id='executeCall'>Call</button>
 </body>
 </html>

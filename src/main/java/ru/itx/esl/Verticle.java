@@ -16,6 +16,7 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.ServerWebSocket;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -39,7 +40,8 @@ public class Verticle extends AbstractVerticle {
 		"variable_sip_history_info"
 	));
 	
-	Pattern pattern = Pattern.compile("<sip:(\\+.*?)@");
+	private Pattern patternSIPUser  = Pattern.compile("<sip:(\\+.*?)@");
+	private Pattern patternWSMSISDN = Pattern.compile("^/ws/(\\+.*?)$");
 	
 	private List<ServerWebSocket> webSockets = new ArrayList<ServerWebSocket>();
 	
@@ -61,19 +63,33 @@ public class Verticle extends AbstractVerticle {
 	}
 	
 	private void httpHandler(HttpServerRequest request) {
-		if (request.uri().equals("/"))
+		if (request.uri().equals("/")) {
 			request.response().end(vertx.fileSystem().readFileBlocking("websocket.html"));
+		} else if (request.uri().equals("/sockets")) {
+			JsonArray response = new JsonArray();
+			for (ServerWebSocket webSocket : webSockets)
+				response.add(new JsonObject()
+					.put("path", webSocket.path().replace("/ws/", ""))
+					.put("remoteAddress", webSocket.remoteAddress().toString())
+				);
+			request.response().putHeader("content-type", "application/json").end(response.toBuffer());
+		}
 	}
 	
 	private void wsHandler(ServerWebSocket webSocket) {
-		webSockets.add(webSocket);
-		webSocket.handler(buffer -> {
-			try {
-				command(buffer.toJsonObject());
-			} catch (Exception e) {
-				logger.error(e);
-			}
-		});
+		Matcher matcher = patternWSMSISDN.matcher(webSocket.path());
+		if (matcher.find()) {
+			webSockets.add(webSocket);
+			webSocket.handler(buffer -> {
+				try {
+					command(webSocket, buffer.toJsonObject());
+				} catch (Exception e) {
+					logger.error(e);
+				}
+			});
+		} else {
+			webSocket.reject(404);
+		}
 	}
 	
 	private void eslHandler(AsyncResult<NetSocket> result) {
@@ -93,22 +109,24 @@ public class Verticle extends AbstractVerticle {
 				buffer = eslBuffer.appendBuffer(Buffer.buffer("\n")).appendBuffer(buffer);
 				eslBuffer = null;
 			}
-			Map<String,Object> message = eslMessagesParser(buffer);
+			Map<String,Object> message = eslMessageParser(buffer);
 			logger.info("Text Message : " + message);
 			ListIterator<ServerWebSocket> webSocketIterator = webSockets.listIterator();
 			while (webSocketIterator.hasNext()) {
 				ServerWebSocket webSocket = webSocketIterator.next();
-				try {
-					webSocket.writeTextMessage(new JsonObject(message).toString());
-				} catch (Exception e) {
-					logger.info("Removing WebSocket : " + webSocket.path() + "::" + webSocket.textHandlerID() + " due to : " + e.toString());
-					webSocketIterator.remove();
+				if (eslMessageAllowed(message,webSocket)) {
+					try {
+						webSocket.writeTextMessage(new JsonObject(message).toString());
+					} catch (Exception e) {
+						logger.info("Removing WebSocket : " + webSocket.path() + "::" + webSocket.textHandlerID() + " due to : " + e.toString());
+						webSocketIterator.remove();
+					}
 				}
 			}
 		}
 	}
 	
-	private Map<String,Object> eslMessagesParser(Buffer buffer) {
+	private Map<String,Object> eslMessageParser(Buffer buffer) {
 		Map<String,Object> message = new HashMap<String, Object>();
 		StringBuilder body = new StringBuilder();
 		for (String line : buffer.toString().split("\n")) {
@@ -128,7 +146,7 @@ public class Verticle extends AbstractVerticle {
 		if (body.length() > 0)
 			message.put("Body", body);
 		if (message.get("variable_sip_history_info") != null) {
-			Matcher matcher = pattern.matcher(message.get("variable_sip_history_info").toString());
+			Matcher matcher = patternSIPUser.matcher(message.get("variable_sip_history_info").toString());
 			if (matcher.find()) {
 				message.put("Caller-History-Number", matcher.group(1));
 				message.remove("variable_sip_history_info");
@@ -136,9 +154,23 @@ public class Verticle extends AbstractVerticle {
 		}
 		return message;
 	}
+	
+	private boolean eslMessageAllowed(Map<String,Object> message, ServerWebSocket webSocket) {
+		String msisdn = webSocket.path().replace("/ws/", "");
+		if (message.get("Event-Name").equals("CHANNEL_PARK")) {
+			Object one = message.get("Caller-History-Number");
+			Object two = message.get("Caller-Caller-ID-Number");
+			return one != null && two != null && (one.equals(msisdn) || two.equals(msisdn));
+			// TODO: associate Unique-ID with WebSocket
+		} else {
+			// TODO: check if Unique-ID associated with WebSocket
+			return true;
+		}
+	}
 
-	private void command(JsonObject command) {
+	private void command(ServerWebSocket webSocket, JsonObject command) {
 		logger.info("JSON Command : " + command);
+		// TODO: check if Unique-ID associated with WebSocket
 		String uuid = command.getString("uuid");
 		String action = command.getString("action");
 		String commandText = null;
@@ -149,7 +181,8 @@ public class Verticle extends AbstractVerticle {
 		} else if (action.equals("hangup")) {
 			commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
 		} else if (action.equals("call")) {
-			commandText = "api originate sofia/gateway/mss/"+command.getString("destination")+" &park()";
+			String caller = webSocket.path().replace("/ws/", "");
+			commandText = "api originate {origination_caller_id_number="+caller+"}sofia/gateway/mss/"+command.getString("destination")+" &park()";
 		} 
 		if (commandText != null)
 			command(commandText);
