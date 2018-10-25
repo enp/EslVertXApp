@@ -35,18 +35,20 @@ public class Verticle extends AbstractVerticle {
 		"Content-Type",
 		"Event-Name",
 		"Unique-ID",
+		"Caller-Logical-Direction",
 		"Caller-Caller-ID-Number",
 		"Caller-Destination-Number",
+		"Playback-File-Path",
 		"variable_sip_history_info"
 	));
 	
 	private Pattern patternSIPUser  = Pattern.compile("<sip:(\\+.*?)@");
 	private Pattern patternWSMSISDN = Pattern.compile("^/ws/(\\+.*?)$");
 	
-	private List<ServerWebSocket> webSockets = new ArrayList<ServerWebSocket>();
+	private List<Agent> agents = new ArrayList<Agent>();
 	
 	private JsonObject conf;
-
+	
 	public void start() throws Exception {
 		
 		conf = new JsonObject(vertx.fileSystem().readFileBlocking("config.json"));
@@ -66,20 +68,14 @@ public class Verticle extends AbstractVerticle {
 		if (request.uri().equals("/")) {
 			request.response().end(vertx.fileSystem().readFileBlocking("websocket.html"));
 		} else if (request.uri().equals("/sockets")) {
-			JsonArray response = new JsonArray();
-			for (ServerWebSocket webSocket : webSockets)
-				response.add(new JsonObject()
-					.put("path", webSocket.path().replace("/ws/", ""))
-					.put("remoteAddress", webSocket.remoteAddress().toString())
-				);
-			request.response().putHeader("content-type", "application/json").end(response.toBuffer());
+			request.response().putHeader("content-type", "application/json").end(new JsonArray(agents).toBuffer());
 		}
 	}
 	
 	private void wsHandler(ServerWebSocket webSocket) {
 		Matcher matcher = patternWSMSISDN.matcher(webSocket.path());
 		if (matcher.find()) {
-			webSockets.add(webSocket);
+			agents.add(new Agent(matcher.group(1), webSocket));
 			webSocket.handler(buffer -> {
 				try {
 					command(webSocket, buffer.toJsonObject());
@@ -111,15 +107,15 @@ public class Verticle extends AbstractVerticle {
 			}
 			Map<String,Object> message = eslMessageParser(buffer);
 			logger.info("Text Message : " + message);
-			ListIterator<ServerWebSocket> webSocketIterator = webSockets.listIterator();
-			while (webSocketIterator.hasNext()) {
-				ServerWebSocket webSocket = webSocketIterator.next();
-				if (eslMessageAllowed(message,webSocket)) {
+			ListIterator<Agent> agentsIterator = agents.listIterator();
+			while (agentsIterator.hasNext()) {
+				Agent agent = agentsIterator.next();
+				if (eslMessageAllowed(message,agent)) {
 					try {
-						webSocket.writeTextMessage(new JsonObject(message).toString());
+						agent.send(new JsonObject(message).toString());
 					} catch (Exception e) {
-						logger.info("Removing WebSocket : " + webSocket.path() + "::" + webSocket.textHandlerID() + " due to : " + e.toString());
-						webSocketIterator.remove();
+						logger.info("Removing agent : " + agent + " due to : " + e.toString());
+						agentsIterator.remove();
 					}
 				}
 			}
@@ -132,12 +128,13 @@ public class Verticle extends AbstractVerticle {
 		for (String line : buffer.toString().split("\n")) {
 			String[] keyvalue = line.split(":");
 			if (keyvalue.length == 2) {
-				if (headers.contains(keyvalue[0].trim()))
+				if (headers.contains(keyvalue[0].trim())) {
 					try {
 						message.put(keyvalue[0].trim(), URLDecoder.decode(keyvalue[1].trim(), "UTF-8"));
 					} catch (UnsupportedEncodingException e) {
 						logger.info("Wrong header : " + keyvalue[0].trim() + " => " + keyvalue[1].trim());
 					}
+				}
 			} else {
 				body.append(line);
 				body.append("\n");
@@ -152,17 +149,20 @@ public class Verticle extends AbstractVerticle {
 				message.remove("variable_sip_history_info");
 			}
 		}
+		if (message.get("Playback-File-Path") != null) {
+			message.put("Playback-File", message.get("Playback-File-Path").toString().replace("/opt/sounds/", ""));
+			message.remove("Playback-File-Path");	
+		}
 		return message;
 	}
 	
-	private boolean eslMessageAllowed(Map<String,Object> message, ServerWebSocket webSocket) {
-		String msisdn = webSocket.path().replace("/ws/", "");
-		if (message.get("Event-Name").equals("CHANNEL_PARK") && message.get("Caller-History-Number").equals(msisdn)) {
+	private boolean eslMessageAllowed(Map<String,Object> message, Agent agent) {
+		if (message.get("Event-Name").equals("CHANNEL_PARK") && message.get("Caller-Logical-Direction").equals("inbound")) {
+			return message.get("Caller-History-Number") != null && message.get("Caller-History-Number").equals(agent.getMsisdn());
 			// TODO: associate Unique-ID of incoming call with WebSocket
-			return true;
-		} else if (message.get("Event-Name").equals("CHANNEL_ANSWER") && message.get("Caller-Caller-ID-Number").equals(msisdn)) {
+		} else if (message.get("Event-Name").equals("CHANNEL_ANSWER") && message.get("Caller-Logical-Direction").equals("outbound")) {
+			return message.get("Caller-Caller-ID-Number") != null && message.get("Caller-Caller-ID-Number").equals(agent.getMsisdn());
 			// TODO: associate Unique-ID of outgoing call with WebSocket
-			return true;
 		} else {
 			// TODO: check if Unique-ID of call associated with WebSocket
 			return true;
