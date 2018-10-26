@@ -47,6 +47,8 @@ public class Verticle extends AbstractVerticle {
 	private Pattern patternSIPUser  = Pattern.compile("<sip:(\\+.*?)@");
 	private Pattern patternWSMSISDN = Pattern.compile("^/ws/(\\+.*?)$");
 	
+	private String media;
+	
 	private List<Agent> agents = new ArrayList<Agent>();
 	
 	private JsonObject conf;
@@ -54,6 +56,8 @@ public class Verticle extends AbstractVerticle {
 	public void start() throws Exception {
 		
 		conf = new JsonObject(vertx.fileSystem().readFileBlocking("config.json"));
+		
+		media = conf.getJsonObject("esl").getString("media", "/opt/media/");
 		
 		String eslHost = conf.getJsonObject("esl").getString("host", "127.0.0.1");
 		Integer eslPort = conf.getJsonObject("esl").getInteger("port", 8021);
@@ -158,7 +162,9 @@ public class Verticle extends AbstractVerticle {
 			}
 		}
 		if (message.get("Playback-File-Path") != null) {
-			message.put("Playback-File", message.get("Playback-File-Path").toString().replace("/opt/sounds/", ""));
+			String path[] = message.get("Playback-File-Path").toString().split("/");
+			String file = path[path.length - 1];
+			message.put("Playback-File", file);
 			message.remove("Playback-File-Path");	
 		}
 		return message;
@@ -201,7 +207,7 @@ public class Verticle extends AbstractVerticle {
 			if (action.equals("answer")) {
 				commandText = "api uuid_answer "+uuid;
 			} else if (action.equals("playback")) {
-				commandText = "api uuid_broadcast "+uuid+" playback::/opt/sounds/"+command.getString("file");
+				commandText = "api uuid_broadcast "+uuid+" playback::"+media+agent.getMsisdn()+"/"+command.getString("file");
 			} else if (action.equals("hangup")) {
 				commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
 			} else if (action.equals("call")) {
