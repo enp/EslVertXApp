@@ -21,7 +21,8 @@ if (window.WebSocket) {
 	            		socket.send(JSON.stringify({ uuid : uuid, action : 'playback', file : 'welcome.wav' }))
 	            		break
 	            	case 'PLAYBACK_STOP':
-	            		socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
+	            		if (!event['Conference-Name'])
+	            			socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
 	            		break
 	            }
 	        }
@@ -31,6 +32,9 @@ if (window.WebSocket) {
 	    }
 	    executeCall.onclick = function() {
 	    	socket.send(JSON.stringify({ action : 'call', destination: destination.value }))
+	    }
+	    executeConference.onclick = function() {
+	    	socket.send(JSON.stringify({ action : 'conference', destination: destination.value }))
 	    }
 	    socketClose.onclick = function() {
 	    	socket.close()
@@ -43,7 +47,9 @@ if (window.WebSocket) {
 <input id='msisdn'>
 <button id='socketOpen'>Open</button>
 <button id='socketClose'>Close</button>
+<br><br>
 <input id='destination'>
 <button id='executeCall'>Call</button>
+<button id='executeConference'>Conference</button>
 </body>
 </html>

@@ -40,6 +40,7 @@ public class Verticle extends AbstractVerticle {
 		"Caller-Destination-Number",
 		"Playback-File-Path",
 		"DTMF-Digit",
+		"variable_conference_name",
 		"variable_sip_history_info"
 	));
 	
@@ -145,6 +146,10 @@ public class Verticle extends AbstractVerticle {
 		}
 		if (body.length() > 0)
 			message.put("Body", body);
+		if (message.get("variable_conference_name") != null) {
+			message.put("Conference-Name", message.get("variable_conference_name"));
+			message.remove("variable_conference_name");
+		}
 		if (message.get("variable_sip_history_info") != null) {
 			Matcher matcher = patternSIPUser.matcher(message.get("variable_sip_history_info").toString());
 			if (matcher.find()) {
@@ -201,11 +206,14 @@ public class Verticle extends AbstractVerticle {
 				commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
 			} else if (action.equals("call")) {
 				commandText = "api originate {origination_caller_id_number="+agent.getMsisdn()+"}sofia/gateway/mss/"+command.getString("destination")+" &park()";
+			} else if (action.equals("conference")) {
+				commandText = "api originate {origination_caller_id_number="+agent.getMsisdn()+"}sofia/gateway/mss/"+command.getString("destination")+" &conference("+agent.getMsisdn().replace("+", "")+")";
 			} 
-			if (commandText != null)
+			if (commandText != null) {
 				command(commandText);
-			else
+			} else {
 				logger.info("Wrong JSON command : " + command);
+			}
 		}
 	}
 
