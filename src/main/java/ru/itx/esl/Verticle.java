@@ -45,7 +45,7 @@ public class Verticle extends AbstractVerticle {
 	));
 	
 	private Pattern patternSIPUser  = Pattern.compile("<sip:(\\+.*?)@");
-	private Pattern patternWSMSISDN = Pattern.compile("^/ws/(\\+.*?)$");
+	private Pattern patternWSMSISDN = Pattern.compile("/ws/(\\+.*?)$");
 	
 	private String media;
 	
@@ -71,9 +71,10 @@ public class Verticle extends AbstractVerticle {
 	}
 	
 	private void httpHandler(HttpServerRequest request) {
-		if (request.uri().equals("/")) {
+		String prefix = conf.getJsonObject("web").getString("prefix", "/");
+		if (request.uri().equals(prefix)) {
 			request.response().end(vertx.fileSystem().readFileBlocking("websocket.html"));
-		} else if (request.uri().equals("/sockets")) {
+		} else if (request.uri().equals(prefix+"sockets")) {
 			request.response().putHeader("content-type", "application/json").end(new JsonArray(agents).toBuffer());
 		}
 	}

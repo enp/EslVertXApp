@@ -5,7 +5,7 @@
 if (window.WebSocket) {
 	window.onload = function() {
 	    socketOpen.onclick = function() {
-	    	socket = new WebSocket('ws://' + location.host + '/ws/' + msisdn.value)
+	    	socket = new WebSocket(location.href.replace('http','ws') + 'ws/' + msisdn.value)
 	        socket.onopen = function() {
 	            console.log('websocket '+socket.url+' opened')
 	        }
