@@ -1,0 +1,3 @@
+FreeSWITCH ESL to WebSocket gateway with custom minimal ESL implementation on top of Vert.x
+
+See resource websocket.html as example of call, answer, playback, conference and hangup
