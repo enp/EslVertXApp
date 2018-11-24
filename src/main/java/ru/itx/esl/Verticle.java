@@ -4,6 +4,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -82,7 +83,17 @@ public class Verticle extends AbstractVerticle {
 	private void wsHandler(ServerWebSocket webSocket) {
 		Matcher matcher = patternWSMSISDN.matcher(webSocket.path());
 		if (matcher.find()) {
-			Agent agent = new Agent(matcher.group(1), webSocket);
+			String msisdn = matcher.group(1);
+			String auth = webSocket.headers().get("Authorization");
+			if (auth != null) {
+				String decoded = new String(Base64.getDecoder().decode(auth.replace("Basic ", "")));
+				String login = decoded.split(":")[0];
+				if (!login.equals(msisdn)) {
+					logger.info("Login and MSISDN must be the same : " + login + " != " + msisdn);
+					webSocket.reject(403);
+				}
+			}
+			Agent agent = new Agent(msisdn, webSocket);
 			agents.add(agent);
 			webSocket.closeHandler(v -> agents.remove(agent));
 			webSocket.handler(buffer -> {

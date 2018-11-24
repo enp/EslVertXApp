@@ -1,55 +1,62 @@
 <html>
-<head><title>WSS</title></head>
+<head><title>WebSocket call control example</title></head>
 <body>
 <script>
 if (window.WebSocket) {
 	window.onload = function() {
-	    socketOpen.onclick = function() {
-	    	socket = new WebSocket(location.href.replace('http','ws') + 'ws/' + msisdn.value)
-	        socket.onopen = function() {
-	            console.log('websocket '+socket.url+' opened')
-	        }
-	        socket.onmessage = function(message) {
-	            var event = JSON.parse(message.data)
-	            var uuid = event['Unique-ID']
-	            console.log(event)
-	            switch (event['Event-Name']) {
-	            	case 'CHANNEL_PARK':
-	            		socket.send(JSON.stringify({ uuid : uuid, action : 'answer' }))
-	            		break
-	            	case 'CHANNEL_ANSWER':
-	            		socket.send(JSON.stringify({ uuid : uuid, action : 'playback', file : 'welcome.wav' }))
-	            		break
-	            	case 'PLAYBACK_STOP':
-	            		if (!event['Conference-Name'])
-	            			socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
-	            		break
-	            }
-	        }
-	        socket.onclose = function() {
-	            console.log('websocket '+socket.url+' closed')
-	        }
+	    connection.onclick = function() {
+	    	if (connection.innerText == 'Connect') {
+		    	socket = new WebSocket(location.href.replace('http://','ws://'+login.value+':'+password.value+'@') + 'ws/'+login.value)
+		        socket.onopen = function() {
+		    		connection.innerText = 'Disconnect'
+		    		actions.style.display = 'block'
+		            console.log('websocket '+socket.url+' opened')
+		        }
+		        socket.onmessage = function(message) {
+		            var event = JSON.parse(message.data)
+		            var uuid = event['Unique-ID']
+		            console.log(event)
+		            switch (event['Event-Name']) {
+		            	case 'CHANNEL_PARK':
+		            		socket.send(JSON.stringify({ uuid : uuid, action : 'answer' }))
+		            		break
+		            	case 'CHANNEL_ANSWER':
+		            		socket.send(JSON.stringify({ uuid : uuid, action : 'playback', file : 'welcome.wav' }))
+		            		break
+		            	case 'PLAYBACK_STOP':
+		            		if (!event['Conference-Name'])
+		            			socket.send(JSON.stringify({ uuid : uuid, action : 'hangup' }))
+		            		break
+		            }
+		        }
+		        socket.onclose = function() {
+		    		connection.innerText = 'Connect'
+					actions.style.display = 'none'
+		            console.log('websocket '+socket.url+' closed')
+		        }
+	    	} else {
+	    		socket.close()
+	    	}
 	    }
-	    executeCall.onclick = function() {
+	    call.onclick = function() {
 	    	socket.send(JSON.stringify({ action : 'call', destination: destination.value }))
 	    }
-	    executeConference.onclick = function() {
+	    conference.onclick = function() {
 	    	socket.send(JSON.stringify({ action : 'conference', destination: destination.value }))
-	    }
-	    socketClose.onclick = function() {
-	    	socket.close()
 	    }
 	}    
 } else {
     console.log('Your browser does not support websockets')
 }
 </script>
-<input id='msisdn'>
-<button id='socketOpen'>Open</button>
-<button id='socketClose'>Close</button>
+<input id='login' placeholder='Login'>
+<input id='password' placeholder='Password'>
+<button id='connection'>Connect</button>
 <br><br>
-<input id='destination'>
-<button id='executeCall'>Call</button>
-<button id='executeConference'>Conference</button>
+<div id='actions' style='display:none'>
+<input id='destination' placeholder='Destination'>
+<button id='call'>Call</button>
+<button id='conference'>Conference</button>
+</div>
 </body>
 </html>
