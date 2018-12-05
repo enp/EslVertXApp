@@ -219,7 +219,7 @@ public class Verticle extends AbstractVerticle {
 			if (action.equals("answer")) {
 				commandText = "api uuid_answer "+uuid;
 			} else if (action.equals("playback")) {
-				commandText = "api uuid_broadcast "+uuid+" playback::"+media+agent.getMsisdn()+"/"+command.getString("file");
+				commandText = "api uuid_broadcast "+uuid+" playback::"+media+agent.getMsisdn()+"/prompts/"+command.getString("file");
 			} else if (action.equals("hangup")) {
 				commandText = "api uuid_kill "+uuid+" CALL_REJECTED";
 			} else if (action.equals("call")) {
